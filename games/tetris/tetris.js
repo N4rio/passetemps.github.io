@@ -202,7 +202,7 @@ function playerReset() {
         // Game Over
         board = createBoard();
         score = 0;
-        alert('Game Over! Score: ' + score);
+        alert('Game Over!');
     }
     updateScore();
 }
