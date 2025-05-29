@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Démineur</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="../../src/styles/style_demineur.css">
+    
+</head>
+<body>
+
+    <div id="game-container" class="game-container text-center p-4 md:p-6">
+        <h1 class="text-2xl md:text-3xl font-bold text-slate-700 mb-4">Démineur</h1>
+
+        <div class="game-info flex flex-col sm:flex-row justify-between items-center mb-4 space-y-2 sm:space-y-0 sm:space-x-4">
+            <div class="text-lg text-slate-600">
+                Mines restantes: <span id="mines-count" class="font-semibold">0</span>
+            </div>
+
+            <div class="text-lg text-slate-600">
+                Temps: <span id="timer" class="font-semibold">0</span>
+            </div>
+
+            <button id="reset-button" class="bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg shadow transition duration-150 ease-in-out">
+                Recommencer
+            </button>
+        </div>
+
+        <div class="difficulty-selector mb-4 flex justify-center space-x-2">
+            <button data-difficulty="easy" class="difficulty-btn bg-green-500 hover:bg-green-600 text-white font-semibold py-1 px-3 rounded-md text-sm">Facile (9x9, 10 Mines)</button>
+            <button data-difficulty="medium" class="difficulty-btn bg-yellow-500 hover:bg-yellow-600 text-white font-semibold py-1 px-3 rounded-md text-sm">Moyen (16x16, 40 Mines)</button>
+            <button data-difficulty="hard" class="difficulty-btn bg-red-500 hover:bg-red-600 text-white font-semibold py-1 px-3 rounded-md text-sm">Difficile (20x20, 80 Mines)</button>
+        </div>
+        
+        <div id="grid-container" class="grid-container mx-auto">
+            </div>
+    </div>
+
+    <div id="message-popup" class="message-box hidden">
+        <p id="message-text"></p>
+        <button id="message-ok-button" class="bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg shadow">OK</button>
+    </div>
+
+    <script>
+        // Game settings and state variables
+        const DEFAULT_ROWS = 9;
+        const DEFAULT_COLS = 9;
+        const DEFAULT_MINES = 10;
+
+        let rows = DEFAULT_ROWS;
+        let cols = DEFAULT_COLS;
+        let numMines = DEFAULT_MINES;
+
+        let board = []; // Stores the actual values (mine or number of adjacent mines)
+        let cellStates = []; // Stores the state of each cell: 'hidden', 'revealed', 'flagged'
+        let minesLocations = []; // Stores locations of mines
+        let gameOver = false;
+        let flagsPlaced = 0;
+        let revealedCellsCount = 0;
+        let timerInterval;
+        let secondsElapsed = 0;
+
+        // DOM Elements
+        const gridContainer = document.getElementById('grid-container');
+        const minesCountDisplay = document.getElementById('mines-count');
+        const resetButton = document.getElementById('reset-button');
+        const timerDisplay = document.getElementById('timer');
+        const difficultyButtons = document.querySelectorAll('.difficulty-btn');
+        const messagePopup = document.getElementById('message-popup');
+        const messageText = document.getElementById('message-text');
+        const messageOkButton = document.getElementById('message-ok-button');
+
+        // Difficulty settings
+        const difficulties = {
+            easy: { rows: 9, cols: 9, mines: 10 },
+            medium: { rows: 16, cols: 16, mines: 40 },
+            hard: { rows: 20, cols: 20, mines: 80 }
+        };
+
+        // --- Game Initialization ---
+        function initGame(selectedDifficulty = 'easy') {
+            // Set difficulty
+            const diff = difficulties[selectedDifficulty];
+            rows = diff.rows;
+            cols = diff.cols;
+            numMines = diff.mines;
+
+            // Reset game state
+            gameOver = false;
+            flagsPlaced = 0;
+            revealedCellsCount = 0;
+            secondsElapsed = 0;
+            minesLocations = [];
+            board = [];
+            cellStates = [];
+
+            clearInterval(timerInterval); // Clear any existing timer
+            timerDisplay.textContent = '0s';
+            minesCountDisplay.textContent = numMines;
+
+            // Adjust grid container style for new dimensions
+            gridContainer.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
+            gridContainer.innerHTML = ''; // Clear previous grid
+
+            // Create board and cellStates arrays
+            for (let r = 0; r < rows; r++) {
+                board[r] = [];
+                cellStates[r] = [];
+                for (let c = 0; c < cols; c++) {
+                    board[r][c] = 0;
+                    cellStates[r][c] = 'hidden';
+                }
+            }
+
+            placeMines();
+            calculateNumbers();
+            renderBoard();
+            startTimer();
+        }
+
+        // --- Mine Placement ---
+        function placeMines() {
+            let minesToPlace = numMines;
+            while (minesToPlace > 0) {
+                const r = Math.floor(Math.random() * rows);
+                const c = Math.floor(Math.random() * cols);
+                if (board[r][c] !== 'M') { // 'M' denotes a mine
+                    board[r][c] = 'M';
+                    minesLocations.push({ r, c });
+                    minesToPlace--;
+                }
+            }
+        }
+
+        // --- Calculate Adjacent Mine Counts ---
+        function calculateNumbers() {
+            for (let r = 0; r < rows; r++) {
+                for (let c = 0; c < cols; c++) {
+                    if (board[r][c] === 'M') continue;
+                    let count = 0;
+                    // Check all 8 neighbors
+                    for (let dr = -1; dr <= 1; dr++) {
+                        for (let dc = -1; dc <= 1; dc++) {
+                            if (dr === 0 && dc === 0) continue; // Skip the cell itself
+                            const nr = r + dr;
+                            const nc = c + dc;
+                            if (nr >= 0 && nr < rows && nc >= 0 && nc < cols && board[nr][nc] === 'M') {
+                                count++;
+                            }
+                        }
+                    }
+                    board[r][c] = count;
+                }
+            }
+        }
+
+        // --- Render Board ---
+        function renderBoard() {
+            gridContainer.innerHTML = ''; // Clear previous board rendering
+            for (let r = 0; r < rows; r++) {
+                for (let c = 0; c < cols; c++) {
+                    const cell = document.createElement('div');
+                    cell.classList.add('cell');
+                    cell.dataset.row = r;
+                    cell.dataset.col = c;
+
+                    // Apply styles based on cell state
+                    if (cellStates[r][c] === 'revealed') {
+                        cell.classList.add('revealed');
+                        if (board[r][c] === 'M') {
+                            cell.classList.add('mine');
+                            cell.textContent = '💣';
+                        } else if (board[r][c] > 0) {
+                            cell.textContent = board[r][c];
+                            cell.classList.add(`number-${board[r][c]}`);
+                        }
+                    } else if (cellStates[r][c] === 'flagged') {
+                        cell.classList.add('flagged');
+                        cell.textContent = '🚩';
+                    }
+                    // Hidden cells have no specific text content initially
+
+                    cell.addEventListener('click', () => handleCellClick(r, c));
+                    cell.addEventListener('contextmenu', (e) => {
+                        e.preventDefault(); // Prevent default context menu
+                        handleCellRightClick(r, c);
+                    });
+                    gridContainer.appendChild(cell);
+                }
+            }
+            updateMinesCount();
+        }
+
+        // --- Handle Cell Clicks ---
+        function handleCellClick(r, c) {
+            if (gameOver || cellStates[r][c] === 'revealed' || cellStates[r][c] === 'flagged') {
+                return;
+            }
+
+            // First click safeguard: ensure the first click is never a mine
+            if (revealedCellsCount === 0 && board[r][c] === 'M') {
+                // Temporarily move the mine and recalculate numbers for a small area
+                let newR, newC;
+                do {
+                    newR = Math.floor(Math.random() * rows);
+                    newC = Math.floor(Math.random() * cols);
+                } while (board[newR][newC] === 'M' || (newR === r && newC === c));
+
+                board[newR][newC] = 'M'; // Place new mine
+                board[r][c] = 0; // Clear original spot
+                
+                // Remove old mine from locations and add new one
+                minesLocations = minesLocations.filter(loc => !(loc.r === r && loc.c === c));
+                minesLocations.push({r: newR, c: newC});
+
+                // Recalculate numbers around old and new mine spots
+                // This is a simplified recalculation. A full recalculateNumbers() is safer.
+                calculateNumbers(); // Recalculate all numbers for simplicity and correctness
+            }
+
+
+            revealCell(r, c);
+
+            if (board[r][c] === 'M') {
+                triggerGameOver(false); // Player hit a mine
+            } else {
+                checkWinCondition();
+            }
+            renderBoard(); // Re-render to show changes
+        }
+
+        function handleCellRightClick(r, c) {
+            if (gameOver || cellStates[r][c] === 'revealed') {
+                return;
+            }
+
+            if (cellStates[r][c] === 'hidden') {
+                if (flagsPlaced < numMines) {
+                    cellStates[r][c] = 'flagged';
+                    flagsPlaced++;
+                } else {
+                    // Optionally show a message that no more flags can be placed
+                    console.log("Nombre maximum de drapeaux atteint.");
+                }
+            } else if (cellStates[r][c] === 'flagged') {
+                cellStates[r][c] = 'hidden';
+                flagsPlaced--;
+            }
+            renderBoard(); // Re-render to show flag
+        }
+
+        // --- Reveal Cell Logic ---
+        function revealCell(r, c) {
+            if (r < 0 || r >= rows || c < 0 || c >= cols || cellStates[r][c] === 'revealed') {
+                return; // Out of bounds or already revealed
+            }
+
+            if (cellStates[r][c] === 'flagged') return; // Don't reveal flagged cells
+
+            cellStates[r][c] = 'revealed';
+            revealedCellsCount++;
+
+            if (board[r][c] === 0) { // If it's an empty cell, flood fill
+                // Reveal neighbors
+                for (let dr = -1; dr <= 1; dr++) {
+                    for (let dc = -1; dc <= 1; dc++) {
+                        if (dr === 0 && dc === 0) continue;
+                        revealCell(r + dr, c + dc);
+                    }
+                }
+            }
+            // If it's a mine, game over logic is handled in handleCellClick
+            // If it's a number, it's revealed, and that's it.
+        }
+
+        // --- Game Over and Win Condition ---
+        function triggerGameOver(isWin) {
+            gameOver = true;
+            clearInterval(timerInterval); // Stop the timer
+            revealAllMines();
+            renderBoard(); // Show all mines
+
+            if (isWin) {
+                showPopupMessage("Félicitations ! Vous avez gagné ! 🎉");
+            } else {
+                showPopupMessage("BOOM ! Vous avez touché une mine. 💣");
+            }
+        }
+
+        function revealAllMines() {
+            for (const mineLoc of minesLocations) {
+                if (cellStates[mineLoc.r][mineLoc.c] !== 'flagged') { // Only reveal unflagged mines
+                    cellStates[mineLoc.r][mineLoc.c] = 'revealed'; // Mark as revealed to show the mine icon
+                }
+            }
+        }
+
+        function checkWinCondition() {
+            // Win if all non-mine cells are revealed
+            const totalNonMineCells = rows * cols - numMines;
+            if (revealedCellsCount === totalNonMineCells) {
+                triggerGameOver(true);
+            }
+        }
+
+        // --- UI Updates ---
+        function updateMinesCount() {
+            minesCountDisplay.textContent = numMines - flagsPlaced;
+        }
+
+        function startTimer() {
+            clearInterval(timerInterval); // Clear existing timer
+            secondsElapsed = 0;
+            timerDisplay.textContent = `${secondsElapsed}s`;
+            timerInterval = setInterval(() => {
+                secondsElapsed++;
+                timerDisplay.textContent = `${secondsElapsed}s`;
+            }, 1000);
+        }
+
+        // --- Popup Message ---
+        function showPopupMessage(message) {
+            messageText.textContent = message;
+            messagePopup.classList.remove('hidden');
+        }
+
+        function hidePopupMessage() {
+            messagePopup.classList.add('hidden');
+        }
+
+        // --- Event Listeners ---
+        resetButton.addEventListener('click', () => {
+            // Determine current difficulty to reset with same settings
+            let currentDifficulty = 'easy'; // Default
+            difficultyButtons.forEach(btn => {
+                if (btn.classList.contains('ring-2')) { // A simple way to mark active difficulty
+                    currentDifficulty = btn.dataset.difficulty;
+                }
+            });
+            initGame(currentDifficulty);
+            hidePopupMessage();
+        });
+        
+        messageOkButton.addEventListener('click', hidePopupMessage);
+
+        difficultyButtons.forEach(button => {
+            button.addEventListener('click', () => {
+                // Visually mark the selected button (optional)
+                difficultyButtons.forEach(btn => btn.classList.remove('ring-2', 'ring-offset-2', 'ring-indigo-500'));
+                button.classList.add('ring-2', 'ring-offset-2', 'ring-indigo-500');
+                
+                initGame(button.dataset.difficulty);
+                hidePopupMessage(); // Hide any existing messages
+            });
+        });
+
+        // --- Initial Game Start ---
+        // Set 'easy' as default selected button visually
+        document.querySelector('.difficulty-btn[data-difficulty="easy"]').classList.add('ring-2', 'ring-offset-2', 'ring-indigo-500');
+        initGame('easy'); // Start with easy difficulty by default
+
+    </script>
+</body>
+</html>
