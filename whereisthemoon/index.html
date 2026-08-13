@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🌙 - Where is the Moon</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;1,9..144,500&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+<link rel="stylesheet" href="style.css">
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+</head>
+<body>
+
+  <canvas id="scene"></canvas>
+
+  <header class="hero">
+    <p class="eyebrow">Système Terre – Lune par N4rio</p>
+    <h1>Where is the Moon ?</h1>
+    <p class="subtitle">Position réelle de la Lune sur son orbite en fonction de la date choisie.</p>
+  </header>
+
+  <aside class="readout" aria-label="Données orbitales">
+    <div class="readout-row">
+      <span class="readout-label">Distance</span>
+      <span class="readout-value" id="val-distance">—</span>
+    </div>
+    <div class="readout-row">
+      <span class="readout-label">Visibilité de la Lune</span>
+      <span class="readout-value" id="val-phase">—</span>
+    </div>
+    <div class="readout-row">
+      <span class="readout-label">Élongation</span>
+      <span class="readout-value" id="val-elong">—</span>
+    </div>
+    <div class="readout-row muted-row">
+      <span class="readout-label">Échelle</span>
+      <span class="readout-value small">Distances Réelles</span>
+    </div>
+  </aside>
+
+  <footer class="date-console" aria-label="Sélection de la date et de l'heure">
+    <div class="console-row">
+      <button id="btn-prev-day" class="step-btn" aria-label="Jour précédent">‹‹</button>
+
+      <div class="date-field">
+        <label for="date-input" class="date-label">Date</label>
+        <input type="date" id="date-input">
+      </div>
+
+      <button id="btn-next-day" class="step-btn" aria-label="Jour suivant">››</button>
+      <button id="btn-now" class="today-btn">Maintenant</button>
+    </div>
+
+    <div class="console-row time-row">
+      <button id="btn-prev-hour" class="step-btn small" aria-label="Heure précédente">‹</button>
+
+      <div class="time-field">
+        <label for="hour-slider" class="date-label">Heure — <span id="hour-display">12:00</span></label>
+        <input type="range" id="hour-slider" min="0" max="23" step="1" value="12">
+      </div>
+
+      <button id="btn-next-hour" class="step-btn small" aria-label="Heure suivante">›</button>
+    </div>
+  </footer>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>
