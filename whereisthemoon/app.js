@@ -123,6 +123,8 @@ const KM_PER_EARTH_RADIUS = 6371;
 const SCENE_UNITS_PER_KM = EARTH_RADIUS / KM_PER_EARTH_RADIUS;
 const MOON_VISUAL_SCALE = 3;         // Lune agrandie pour rester visible (distance, elle, reste réelle)
 const MOON_TRUE_RADIUS_RATIO = 0.273; // rayon Lune / rayon Terre
+const SUN_DISTANCE = 900; // distance de rendu (symbolique, pas à l'échelle réelle)
+
 
 const canvas = document.getElementById('scene');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
@@ -220,7 +222,6 @@ const moonMesh = new THREE.Mesh(
 scene.add(moonMesh);
 
 // --- Soleil : sphère lumineuse + halo, placée dans la direction réelle du Soleil ---
-const SUN_DISTANCE = 620; // distance de rendu (symbolique, pas à l'échelle réelle)
 
 const sunGroup = new THREE.Group();
 scene.add(sunGroup);
@@ -317,7 +318,7 @@ function syncControlsFromDateTime(date) {
   hourSlider.value = date.getUTCHours();
   const utcStr = `${pad2(date.getUTCHours())}:${pad2(date.getUTCMinutes())}`;
   const localStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  hourDisplay.textContent = `${utcStr} UTC (${localStr} chez vous)`;
+  hourDisplay.textContent = `${utcStr} UTC (${localStr} en France)`;
 }
 
 let currentDateTime = new Date();
@@ -348,7 +349,6 @@ function applyDateTime(date) {
   // La Terre (et ses nuages) tournent réellement selon la date ET l'heure choisies
   const rotY = earthRotationY(date, state.sunLonRad);
   earthMesh.rotation.y = rotY;
-  //cloudsMesh.rotation.y = rotY + 0.05; // léger décalage : les nuages dérivent un peu
 
   updateOrbitLine(date);
 
