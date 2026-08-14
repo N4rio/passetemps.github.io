@@ -108,6 +108,9 @@ function moonState(date) {
     illumination,                             // 0..1
     elongationDeg: elongation / DEG,
     sunLonRad: Ls,
+    moonLonRad: lon,
+    moonLatRad: lat,
+    d,
   };
 }
 
@@ -115,7 +118,7 @@ function moonState(date) {
    SCÈNE 3D
    ========================================================================= */
 
-const EARTH_RADIUS = 4; // unité de scène pour la Terre
+const EARTH_RADIUS = 4;              // unité de scène pour la Terre
 const KM_PER_EARTH_RADIUS = 6371;
 const SCENE_UNITS_PER_KM = EARTH_RADIUS / KM_PER_EARTH_RADIUS;
 const MOON_VISUAL_SCALE = 3;         // Lune agrandie pour rester visible (distance, elle, reste réelle)
@@ -139,7 +142,7 @@ controls.maxDistance = 500;
 
 // Étoiles
 function buildStars() {
-  const count = 22000;
+  const count = 2200;
   const positions = new Float32Array(count * 3);
   for (let i = 0; i < count; i++) {
     const r = 900 + Math.random() * 600;
@@ -157,10 +160,10 @@ function buildStars() {
 buildStars();
 
 // Lumière ambiante douce (pour que la face nocturne ne soit pas noir absolu)
-scene.add(new THREE.AmbientLight(0x1a2338, 1));
+scene.add(new THREE.AmbientLight(0x1a2338, 0.55));
 
 // Lumière directionnelle = le Soleil, orientation mise à jour selon la date
-const sunLight = new THREE.DirectionalLight(0xfff3df, 5);
+const sunLight = new THREE.DirectionalLight(0xfff3df, 3.2);
 scene.add(sunLight);
 
 // --- Textures (dépôt officiel three.js, continents / relief / nuages / lumières de nuit) ---
@@ -175,7 +178,15 @@ earthLightsMap.colorSpace = THREE.SRGBColorSpace;
 
 // Terre
 const earthGroup = new THREE.Group();
-earthGroup.rotation.z = 23.44 * DEG; // inclinaison de l'axe
+// Inclinaison de l'axe (23,44°) — FIXE dans l'espace toute l'année, comme le
+// vrai axe terrestre (il pointe en permanence vers l'étoile Polaire). Ce n'est
+// pas l'axe qui change entre l'été et l'hiver, mais l'angle entre cet axe fixe
+// et la direction du Soleil, qui varie au fil de l'orbite terrestre.
+// On bascule ici autour de l'axe X (et non Z) pour que le pôle Nord penche
+// vers -Z : cela correspond, avec notre convention solaire (sunLonRad), au
+// moment où la longitude écliptique du Soleil vaut 90° — le solstice d'été
+// boréal (~21 juin), quand le pôle Nord doit être incliné vers le Soleil.
+earthGroup.rotation.x = -23.44 * DEG;
 scene.add(earthGroup);
 
 const earthMesh = new THREE.Mesh(
@@ -193,18 +204,6 @@ const earthMesh = new THREE.Mesh(
 );
 earthGroup.add(earthMesh);
 
-// Couche de nuages, légèrement au-dessus de la surface, tourne un peu plus vite
-const cloudsMesh = new THREE.Mesh(
-  new THREE.SphereGeometry(EARTH_RADIUS * 1.012, 96, 96),
-  new THREE.MeshStandardMaterial({
-    alphaMap: earthCloudsMap,
-    color: 0xffffff,
-    transparent: true,
-    opacity: 0.55,
-    depthWrite: false,
-  })
-);
-//earthGroup.add(cloudsMesh);
 
 // fine atmosphère
 const atmosphere = new THREE.Mesh(
@@ -221,7 +220,7 @@ const moonMesh = new THREE.Mesh(
 scene.add(moonMesh);
 
 // --- Soleil : sphère lumineuse + halo, placée dans la direction réelle du Soleil ---
-const SUN_DISTANCE = 1000; // distance de rendu (symbolique, pas à l'échelle réelle)
+const SUN_DISTANCE = 620; // distance de rendu (symbolique, pas à l'échelle réelle)
 
 const sunGroup = new THREE.Group();
 scene.add(sunGroup);
@@ -246,10 +245,29 @@ const sunGlow = new THREE.Sprite(
 sunGlow.scale.set(90, 90, 1);
 sunGroup.add(sunGlow);
 
+// Repère de position (ville de l'observateur), enfant de earthMesh : suit
+// automatiquement la rotation réelle de la Terre.
+const cityMarker = new THREE.Mesh(
+  new THREE.SphereGeometry(0.12, 16, 16),
+  new THREE.MeshBasicMaterial({ color: 0xE32E17 })
+);
+earthMesh.add(cityMarker);
+
+function updateCityMarker(latDeg, lonDeg) {
+  const phi = latDeg * DEG;
+  const lambda = lonDeg * DEG;
+  const r = EARTH_RADIUS * 1.02;
+  cityMarker.position.set(
+    r * Math.cos(lambda) * Math.cos(phi),
+    r * Math.sin(phi),
+    -r * Math.sin(lambda) * Math.cos(phi)
+  );
+}
+
 // Trajectoire orbitale (tracé fin)
 const orbitLine = new THREE.Line(
   new THREE.BufferGeometry(),
-  new THREE.LineBasicMaterial({ color: 0xc9a876, transparent: true, opacity: 0.35 })
+  new THREE.LineBasicMaterial({ color: 0xE32E17, transparent: true, opacity: 0.6 })
 );
 scene.add(orbitLine);
 
@@ -299,7 +317,7 @@ function syncControlsFromDateTime(date) {
   hourSlider.value = date.getUTCHours();
   const utcStr = `${pad2(date.getUTCHours())}:${pad2(date.getUTCMinutes())}`;
   const localStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  hourDisplay.textContent = `${utcStr} UTC (${localStr} en France)`;
+  hourDisplay.textContent = `${utcStr} UTC (${localStr} chez vous)`;
 }
 
 let currentDateTime = new Date();
@@ -330,13 +348,15 @@ function applyDateTime(date) {
   // La Terre (et ses nuages) tournent réellement selon la date ET l'heure choisies
   const rotY = earthRotationY(date, state.sunLonRad);
   earthMesh.rotation.y = rotY;
-  cloudsMesh.rotation.y = rotY + 0.05; // léger décalage : les nuages dérivent un peu
+  //cloudsMesh.rotation.y = rotY + 0.05; // léger décalage : les nuages dérivent un peu
 
   updateOrbitLine(date);
 
   valDistance.textContent = `${Math.round(state.distanceKm).toLocaleString('fr-FR')} km`;
   valPhase.textContent = `${Math.round(state.illumination * 100)} %`;
   valElong.textContent = `${state.elongationDeg.toFixed(1)}°`;
+
+  updateLocationPanel(date, state);
 }
 
 function goToDateTime(date) {
@@ -387,6 +407,132 @@ document.getElementById('btn-now').addEventListener('click', () => {
   goToDateTime(new Date());
 });
 
+const DEFAULT_CITY = { name: 'Paris, France', lat: 48.8566, lon: 2.3522 };
+let observer = { ...DEFAULT_CITY };
+updateCityMarker(observer.lat, observer.lon);
+
+/* =========================================================================
+   PANNEAU DE DONNÉES — bouton de réduction (reste visible, juste replié)
+   ========================================================================= */
+
+const readoutToggle = document.getElementById('readout-toggle');
+const readoutRows = document.getElementById('readout-rows');
+
+readoutToggle.addEventListener('click', () => {
+  const expanded = readoutToggle.getAttribute('aria-expanded') === 'true';
+  readoutToggle.setAttribute('aria-expanded', String(!expanded));
+  readoutRows.classList.toggle('collapsed', expanded);
+});
+
+/* =========================================================================
+   PANNEAU "MA POSITION" — ville, heure solaire locale, visibilité de la
+   Lune, prochaine éclipse solaire
+   ========================================================================= */
+
+const locationToggle = document.getElementById('location-toggle');
+const locationBody = document.getElementById('location-body');
+const cityInput = document.getElementById('city-input');
+const citySearchBtn = document.getElementById('city-search-btn');
+const cityStatus = document.getElementById('city-status');
+const valLocalTime = document.getElementById('val-local-time');
+const valMoonVisible = document.getElementById('val-moon-visible');
+
+locationToggle.addEventListener('click', () => {
+  const expanded = locationToggle.getAttribute('aria-expanded') === 'true';
+  locationToggle.setAttribute('aria-expanded', String(!expanded));
+  locationBody.classList.toggle('open', !expanded);
+});
+
+
+// Heure solaire locale approximative : UTC décalée selon la longitude
+// (15° = 1h). Ce n'est pas le fuseau administratif (qui suit des frontières
+// et l'heure d'été), juste une approximation basée sur la position du Soleil.
+function localSolarTimeStr(date, lonDeg) {
+  const utcHours = date.getUTCHours() + date.getUTCMinutes() / 60;
+  let lst = ((utcHours + lonDeg / 15) % 24 + 24) % 24;
+  const hh = Math.floor(lst);
+  let mm = Math.round((lst - hh) * 60);
+  if (mm === 60) mm = 0;
+  return `${pad2(hh)}:${pad2(mm)}`;
+}
+
+// Altitude de la Lune au-dessus de l'horizon, pour un lieu donné (lat/lon en
+// degrés). Conversion écliptique -> équatoriale -> horizontale, cohérente
+// avec le niveau de précision du reste du modèle (Schlyter, basse précision).
+function moonAltitudeDeg(date, state, latDeg, lonDeg) {
+  const eps = (23.4393 - 3.563e-7 * state.d) * DEG; // obliquité de l'écliptique
+  const cosLat = Math.cos(state.moonLatRad);
+  const xeq = Math.cos(state.moonLonRad) * cosLat;
+  const yeq = Math.sin(state.moonLonRad) * cosLat * Math.cos(eps) - Math.sin(state.moonLatRad) * Math.sin(eps);
+  const zeq = Math.sin(state.moonLonRad) * cosLat * Math.sin(eps) + Math.sin(state.moonLatRad) * Math.cos(eps);
+
+  const ra = Math.atan2(yeq, xeq);
+  const dec = Math.atan2(zeq, Math.sqrt(xeq * xeq + yeq * yeq));
+
+  const utcHours = date.getUTCHours() + date.getUTCMinutes() / 60 + date.getUTCSeconds() / 3600;
+  const gmst0 = normDeg(state.sunLonRad / DEG + 180);
+  const lst = normDeg(gmst0 + utcHours * 15 + lonDeg) * DEG;
+  const hourAngle = lst - ra;
+
+  const latRad = latDeg * DEG;
+  const sinAlt = Math.sin(dec) * Math.sin(latRad) + Math.cos(dec) * Math.cos(latRad) * Math.cos(hourAngle);
+  return Math.asin(Math.max(-1, Math.min(1, sinAlt))) / DEG;
+}
+
+function updateLocationPanel(date, state) {
+  if (!valLocalTime) return; // sécurité si les éléments ne sont pas présents
+
+  valLocalTime.textContent = `${localSolarTimeStr(date, observer.lon)}`;
+
+  const alt = moonAltitudeDeg(date, state, observer.lat, observer.lon);
+  valMoonVisible.textContent = alt > 0
+    ? `Visible, ${Math.round(alt)}° au-dessus de l'horizon`
+    : `Sous l'horizon (${Math.round(alt)}°)`;
+}
+
+async function searchCity(query) {
+  if (!query || !query.trim()) {
+    observer = { ...DEFAULT_CITY };
+    cityStatus.textContent = 'Par défaut : Paris, France.';
+    updateCityMarker(observer.lat, observer.lon);
+    updateLocationPanel(currentDateTime, moonState(currentDateTime));
+    return;
+  }
+
+  cityStatus.textContent = 'Recherche…';
+  try {
+    const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&accept-language=fr&q=${encodeURIComponent(query)}`;
+    const res = await fetch(url, { headers: { Accept: 'application/json' } });
+    if (!res.ok) throw new Error('network');
+    const results = await res.json();
+
+    if (!results.length) {
+      cityStatus.textContent = `Ville introuvable — on reste sur ${DEFAULT_CITY.name}.`;
+      observer = { ...DEFAULT_CITY };
+    } else {
+      const r = results[0];
+      const shortName = r.display_name.split(',').slice(0, 2).join(',').trim();
+      observer = { name: shortName, lat: parseFloat(r.lat), lon: parseFloat(r.lon) };
+      cityStatus.textContent = `${observer.name} (${observer.lat.toFixed(2)}°, ${observer.lon.toFixed(2)}°)`;
+    }
+  } catch (err) {
+    cityStatus.textContent = `Recherche indisponible (problème de réseau) — on reste sur ${DEFAULT_CITY.name}.`;
+    observer = { ...DEFAULT_CITY };
+  }
+
+  updateCityMarker(observer.lat, observer.lon);
+  updateLocationPanel(currentDateTime, moonState(currentDateTime));
+}
+
+citySearchBtn.addEventListener('click', () => searchCity(cityInput.value));
+cityInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    searchCity(cityInput.value);
+  }
+});
+
+// Premier rendu, maintenant que tous les éléments du panneau sont prêts
 applyDateTime(currentDateTime);
 
 /* =========================================================================

@@ -3,7 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>🌙 - Where is the Moon</title>
+<title>Où est la Lune</title>
+<link rel="icon" href="images/moon.ico">
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -28,24 +29,63 @@
     <p class="eyebrow">Système Terre – Lune par N4rio</p>
     <h1>Where is the Moon ?</h1>
     <p class="subtitle">Position réelle de la Lune sur son orbite en fonction de la date choisie.</p>
+
+    <div class="location-panel">
+      <button id="location-toggle" class="location-toggle" type="button" aria-expanded="false" aria-controls="location-body">
+        <span>Choisir sa ville</span>
+        <span class="chevron" id="location-chevron">▾</span>
+      </button>
+
+      <div id="location-body" class="location-body">
+        <label for="city-input" class="date-label">Ville</label>
+        <div class="city-row">
+          <input type="text" id="city-input" placeholder="Paris, France" autocomplete="off">
+          <button id="city-search-btn" class="step-btn small" type="button" aria-label="Rechercher la ville">→</button>
+        </div>
+        <p id="city-status" class="city-status">Par défaut : Paris, France.</p>
+
+        <div class="readout-row">
+          <span class="readout-label">Heure solaire locale</span>
+          <span class="readout-value" id="val-local-time">—</span>
+        </div>
+        <div class="readout-row">
+          <span class="readout-label">Visibilité de la Lune</span>
+          <span class="readout-value" id="val-moon-visible">—</span>
+        </div>
+        <!-- <div class="readout-row muted-row">
+          <span class="readout-label">Prochaine éclipse solaire</span>
+          <span class="readout-value small" id="val-next-eclipse">—</span>
+        </div> -->
+      </div>
+    </div>
+
   </header>
 
   <aside class="readout" aria-label="Données orbitales">
-    <div class="readout-row">
-      <span class="readout-label">Distance</span>
-      <span class="readout-value" id="val-distance">—</span>
+    <div class="readout-topbar">
+      <span class="readout-title">Données</span>
+      <button id="readout-toggle" class="readout-toggle-btn" type="button" aria-expanded="true" aria-controls="readout-rows" aria-label="Réduire le panneau de données">
+        <span class="chevron">▾</span>
+      </button>
     </div>
-    <div class="readout-row">
-      <span class="readout-label">Visibilité de la Lune</span>
-      <span class="readout-value" id="val-phase">—</span>
-    </div>
-    <div class="readout-row">
-      <span class="readout-label">Élongation</span>
-      <span class="readout-value" id="val-elong">—</span>
-    </div>
-    <div class="readout-row muted-row">
-      <span class="readout-label">Échelle</span>
-      <span class="readout-value small">Distances Réelles</span>
+
+    <div id="readout-rows" class="readout-rows">
+      <div class="readout-row">
+        <span class="readout-label">Distance</span>
+        <span class="readout-value" id="val-distance">—</span>
+      </div>
+      <div class="readout-row">
+        <span class="readout-label">Visibilité de la Lune</span>
+        <span class="readout-value" id="val-phase">—</span>
+      </div>
+      <div class="readout-row">
+        <span class="readout-label">Élongation</span>
+        <span class="readout-value" id="val-elong">—</span>
+      </div>
+      <div class="readout-row muted-row">
+        <span class="readout-label">Échelle</span>
+        <span class="readout-value small">Distances Réelles</span>
+      </div>
     </div>
   </aside>
 

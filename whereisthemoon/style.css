@@ -39,7 +39,7 @@ html, body {
   top: 0;
   left: 0;
   padding: 28px 32px;
-  max-width: 500px;
+  max-width: 450px;
   pointer-events: none;
 }
 
@@ -68,7 +68,101 @@ html, body {
   max-width: 340px;
 }
 
-/* ---------- Panneau de lecture (instrument) ---------- */
+/* ---------- Panneau "Ma position" (repliable) ---------- */
+
+.location-panel {
+  pointer-events: auto;
+  margin: 4px 0 14px;
+  max-width: 300px;
+}
+
+.location-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
+  padding: 9px 12px;
+  color: var(--moonlight);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.03em;
+  cursor: pointer;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  transition: border-color 0.15s ease;
+}
+
+.location-toggle:hover, .location-toggle:focus-visible {
+  border-color: var(--gold);
+}
+
+.chevron {
+  color: var(--gold);
+  transition: transform 0.2s ease;
+}
+
+.location-toggle[aria-expanded="true"] .chevron {
+  transform: rotate(180deg);
+}
+
+.location-body {
+  max-height: 0;
+  overflow: hidden;
+  opacity: 0;
+  transition: max-height 0.25s ease, opacity 0.2s ease;
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-top: none;
+  border-radius: 0 0 8px 8px;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.location-body.open {
+  max-height: 320px;
+  opacity: 1;
+  padding: 14px 12px 4px;
+}
+
+.city-row {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+#city-input {
+  flex: 1;
+  font-family: var(--font-body);
+  font-size: 13px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--panel-border);
+  border-radius: 6px;
+  padding: 7px 10px;
+  color: var(--moonlight);
+}
+
+#city-input:focus {
+  outline: none;
+  border-color: var(--gold);
+}
+
+.city-status {
+  margin: 0 0 10px;
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--muted);
+  min-height: 14px;
+}
+
+.location-body .readout-row {
+  padding: 7px 0;
+}
+
+
 
 .readout {
   position: fixed;
@@ -77,10 +171,64 @@ html, body {
   background: var(--panel);
   border: 1px solid var(--panel-border);
   border-radius: 4px;
-  padding: 16px 18px;
+  padding: 14px 18px;
   min-width: 210px;
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
+}
+
+.readout-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.readout-title {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--gold);
+}
+
+.readout-toggle-btn {
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 1px solid var(--panel-border);
+  background: transparent;
+  color: var(--moonlight);
+  font-size: 11px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+
+.readout-toggle-btn:hover, .readout-toggle-btn:focus-visible {
+  border-color: var(--gold);
+  color: var(--gold);
+}
+
+.readout-toggle-btn[aria-expanded="true"] .chevron {
+  transform: rotate(180deg);
+}
+
+.readout-rows {
+  max-height: 260px;
+  overflow: hidden;
+  opacity: 1;
+  margin-top: 10px;
+  transition: max-height 0.25s ease, opacity 0.2s ease, margin-top 0.25s ease;
+}
+
+.readout-rows.collapsed {
+  max-height: 0;
+  opacity: 0;
+  margin-top: 0;
 }
 
 .readout-row {
@@ -277,7 +425,7 @@ html, body {
 
 @media (max-width: 640px) {
   .hero { max-width: 260px; padding: 20px; }
-  .subtitle { display: none; }
+  .location-panel { max-width: 220px; }
   .readout { top: auto; bottom: 168px; right: 16px; left: 16px; min-width: auto; }
   .date-console { bottom: 16px; min-width: 300px; width: calc(100vw - 32px); }
   #date-input { width: 118px; font-size: 13px; }
