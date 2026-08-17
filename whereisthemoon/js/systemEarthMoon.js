@@ -8,7 +8,11 @@ import { Star } from "./Models/Star.js";
 import { GraphicStar } from "./Models/GraphicStar.js";
 
 import { StarrySky } from "./Models/StarrySky.js";
-import { Planete } from "./Models/Planete.js";
+import { GraphicPlanete } from "./Models/GraphicPlanete.js";
+
+import { SpaceScene } from "./Models/SpaceScene.js";
+
+import { Camera } from "./Models/Camera.js";
 /* =========================================================================
    ASTRONOMIE — position geocentrique reelle de la Lune
    Algorithme "basse precision" de Paul Schlyter (precision ~1° en longitude),
@@ -34,9 +38,7 @@ function daysSinceEpoch(date) {
 
 function moonState(date) {
   const d = daysSinceEpoch(date)
-  const moon = new Moon("Lune", 
-                        0, 
-                        125.1228, 
+  const moon = new Moon(125.1228, 
                         0.0529538083,
                         5.1454, // inclinaison de l'orbite
                         318.0634,
@@ -47,12 +49,7 @@ function moonState(date) {
                         13.0649929509, // vitesse de rotation
                         d);
 
-  const sun = new Star("Soleil", 
-                        0, 
-                        0,
-                        "" ,
-                        0, 
-                        356.0470, 
+  const sun = new Star(356.0470, 
                         0.9856002585,
                         282.9404,
                         d);
@@ -85,32 +82,13 @@ function moonState(date) {
   const F = Lm - moon.orbitalOrientation;  // argument de latitude
 
   // Perturbations principales en longitude (degres)
-  let dLon = 0;
-  dLon += -1.274 * Math.sin(moon.M - 2 * D);
-  dLon += 0.658 * Math.sin(2 * D);
-  dLon += -0.186 * Math.sin(sun.Ms);
-  dLon += -0.059 * Math.sin(2 * moon.M - 2 * D);
-  dLon += -0.057 * Math.sin(moon.M - 2 * D + sun.Ms);
-  dLon += 0.053 * Math.sin(moon.M + 2 * D);
-  dLon += 0.046 * Math.sin(2 * D - sun.Ms);
-  dLon += 0.041 * Math.sin(moon.M - sun.Ms);
-  dLon += -0.035 * Math.sin(D);
-  dLon += -0.031 * Math.sin(moon.M + sun.Ms);
-  dLon += -0.015 * Math.sin(2 * F - 2 * D);
-  dLon += 0.011 * Math.sin(moon.M - 4 * D);
+  let dLon = moon.PerturbationLon(sun.Ms, D, F);
 
   // Perturbations en latitude (degres)
-  let dLat = 0;
-  dLat += -0.173 * Math.sin(F - 2 * D);
-  dLat += -0.055 * Math.sin(moon.M - F - 2 * D);
-  dLat += -0.046 * Math.sin(moon.M + F - 2 * D);
-  dLat += 0.033 * Math.sin(F + 2 * D);
-  dLat += 0.017 * Math.sin(2 * moon.M + F);
+  let dLat = moon.PerturbationLat(D,F);
 
   // Perturbations en distance (rayons terrestres)
-  let dR = 0;
-  dR += -0.58 * Math.cos(moon.M - 2 * D);
-  dR += -0.46 * Math.cos(2 * D);
+  let dR = moon.PerturbationDistance(D);
 
   lon = lon + dLon * DEG;
   lat = lat + dLat * DEG;
@@ -140,145 +118,42 @@ function moonState(date) {
 /* =========================================================================
    SCÈNE 3D
    ========================================================================= */
-
-const earth = new Planete("Terre", 4, 24);
-
-const KM_PER_EARTH_RADIUS = 6371;
-const SCENE_UNITS_PER_KM = earth.size / KM_PER_EARTH_RADIUS;
-const MOON_TRUE_RADIUS_RATIO = 0.273; // rayon Lune / rayon Terre
-
-const starsBackground = new StarrySky(60000, 0xe8e6df);
-const moonMap = new GraphicMoon("Lune", 3, 0xE32E17);
-const sunMap = new GraphicStar("Soleil", 900, 14, 0xfff1cf, 90);
-
-
+// Liens avec la page
 const canvas = document.getElementById('scene');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.setSize(window.innerWidth, window.innerHeight);
 
-const scene = new THREE.Scene();
+// Initialisation des éléments
+const camera = new Camera(45, 2000, renderer);
+const earthMap = new GraphicPlanete("Terre", 4, 24);
+const starsBackground = new StarrySky(60000, 0xe8e6df);
+const sunMap = new GraphicStar("Soleil", 900, 14, 0xfff1cf, 90);
+const moonMap = new GraphicMoon("Lune", 3, 0xE32E17, earthMap.size, 0.273, sunMap.color);
+const spaceScene = new SpaceScene();
 
-const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 2000);
-camera.position.set(70, 45, 110);
+// Constante
+const KM_PER_EARTH_RADIUS = 6371;
+const SCENE_UNITS_PER_KM = earthMap.size / KM_PER_EARTH_RADIUS;
 
-const controls = new OrbitControls(camera, renderer.domElement);
-controls.enableDamping = true;
-controls.dampingFactor = 0.06;
-controls.minDistance = 10;
-controls.maxDistance = 900;
-
-// etoiles
-const positions = starsBackground.GetStarsPosition();
-
-const geo = new THREE.BufferGeometry();
-geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-const mat = new THREE.PointsMaterial({ color: starsBackground.color, size: 1.3, sizeAttenuation: true });
-scene.add(new THREE.Points(geo, mat));
-
-
-// Lumière ambiante douce (pour que la face nocturne ne soit pas noir absolu)
-scene.add(new THREE.AmbientLight(0x1a2338, 0.55));
-
-// Lumière directionnelle = le Soleil, orientation mise à jour selon la date
-const sunLight = new THREE.DirectionalLight(sunMap.color, 3.2);
-scene.add(sunLight);
-
-// --- Textures (depôt officiel three.js, continents / relief / lumières de nuit) ---
-const texLoader = new THREE.TextureLoader();
-const earthMap = texLoader.load('images/earth_atmos_2048.jpg');
-const earthNormalMap = texLoader.load('images/earth_normal_2048.jpg');
-const earthLightsMap = texLoader.load('images/earth_lights_2048.png');
-earthMap.colorSpace = THREE.SRGBColorSpace;
-earthLightsMap.colorSpace = THREE.SRGBColorSpace;
-
-// Terre
-const earthGroup = new THREE.Group();
-// Inclinaison de l'axe (23,44°) — FIXE dans l'espace toute l'annee, comme le
-// vrai axe terrestre (il pointe en permanence vers l'etoile Polaire). Ce n'est
-// pas l'axe qui change entre l'ete et l'hiver, mais l'angle entre cet axe fixe
-// et la direction du Soleil, qui varie au fil de l'orbite terrestre.
-// On bascule ici autour de l'axe X (et non Z) pour que le pôle Nord penche
-// vers -Z : cela correspond, avec notre convention solaire (sunLonRad), au
-// moment où la longitude ecliptique du Soleil vaut 90° — le solstice d'ete
-// boreal (~21 juin), quand le pôle Nord doit être incline vers le Soleil.
-earthGroup.rotation.x = -23.44 * DEG;
-scene.add(earthGroup);
-
-const earthMesh = new THREE.Mesh(
-  new THREE.SphereGeometry(earth.size, 96, 96),
-  new THREE.MeshStandardMaterial({
-    map: earthMap,               // continents, oceans, relief
-    normalMap: earthNormalMap,   // relief en creux/bosses
-    normalScale: new THREE.Vector2(0.85, 0.85),
-    emissiveMap: earthLightsMap, // lumières des villes côte nuit
-    emissive: new THREE.Color(0xffe9b0),
-    emissiveIntensity: 1.4,
-    roughness: 0.8,
-    metalness: 0.05,
-  })
-);
-earthGroup.add(earthMesh);
+// Création ciel étoilés
+spaceScene.CreateStars(starsBackground);
+// Création de la Lumière
+spaceScene.CreateLight(sunMap.color);
+// Création de la Terre
+earthMap.CreatePlanete(spaceScene);
+// Création de la Lune
+moonMap.CreateMoon(spaceScene);
+// Création du Soleil
+sunMap.CreateStar(spaceScene)
+// Création de la caméra
+camera.CreateCamera([70, 45, 110], 0.06, 10, 900);
 
 
-// fine atmosphère
-const atmosphere = new THREE.Mesh(
-  new THREE.SphereGeometry(earth.size * 1.045, 64, 64),
-  new THREE.MeshBasicMaterial({ color: 0x5ea3d6, transparent: true, opacity: 0.12, side: THREE.BackSide })
-);
-earthGroup.add(atmosphere);
-
-// Lune
-const moonMesh = new THREE.Mesh(
-  new THREE.SphereGeometry(earth.size * MOON_TRUE_RADIUS_RATIO * moonMap.size, 48, 48),
-  new THREE.MeshStandardMaterial({ color: 0xc7c3ba, roughness: 0.95, metalness: 0 })
-);
-scene.add(moonMesh);
-
-// --- Soleil : sphère lumineuse + halo, placee dans la direction reelle du Soleil ---
-
-const sunGroup = new THREE.Group();
-scene.add(sunGroup);
-
-const sunMesh = sunMap.CreateStar();
-sunGroup.add(sunMesh);
-
-const glowTexture = texLoader.load('images/circle.png');
-const sunGlow = new THREE.Sprite(
-  new THREE.SpriteMaterial({
-    map: glowTexture,
-    color: 0xffdca8,
-    transparent: true,
-    opacity: 0.9,
-    blending: THREE.AdditiveBlending,
-    depthWrite: false,
-  })
-);
-sunGlow.scale.set(sunMap.sunGlow, sunMap.sunGlow, 1);
-sunGroup.add(sunGlow);
-
-// Repère de position (ville de l'observateur), enfant de earthMesh : suit
-// automatiquement la rotation reelle de la Terre.
-const cityMarker = new THREE.Mesh(
-  new THREE.SphereGeometry(0.12, 16, 16),
-  new THREE.MeshBasicMaterial({ color: 0xE32E17 })
-);
-earthMesh.add(cityMarker);
-
-function updateCityMarker(latDeg, lonDeg) {
-  const phi = latDeg * DEG;
-  const lambda = lonDeg * DEG;
-  const r = earth.size * 1.02;
-  cityMarker.position.set(
-    r * Math.cos(lambda) * Math.cos(phi),
-    r * Math.sin(phi),
-    -r * Math.sin(lambda) * Math.cos(phi)
-  );
-}
 
 // Trajectoire orbitale (trace fin)
 const orbitLine = moonMap.OrbitLine();
-scene.add(orbitLine);
+spaceScene.AddScene(orbitLine);
 
 function eclipticToScene(vecEarthRadii) {
   // repère ecliptique (x,y dans le plan, z = latitude) -> repère Three.js (Y = haut)
@@ -302,6 +177,7 @@ function updateOrbitLine(centerDate) {
   orbitLine.geometry = new THREE.BufferGeometry().setFromPoints(points);
 }
 
+
 /* =========================================================================
    ETAT / CONTRÔLES DE DATE ET D'HEURE
    ========================================================================= */
@@ -319,8 +195,7 @@ function toDateInputValue(date) {
   return `${date.getUTCFullYear()}-${pad2(date.getUTCMonth() + 1)}-${pad2(date.getUTCDate())}`;
 }
 
-// Calque decoratif refletant l'heure exacte (y compris les minutes), même si
-// le curseur ne se deplace que par pas d'une heure.
+// Calque decoratif refletant l'heure exacte (y compris les minutes), même si le curseur ne se deplace que par pas d'une heure.
 function syncControlsFromDateTime(date) {
   dateInput.value = toDateInputValue(date);
   hourSlider.value = date.getUTCHours();
@@ -337,15 +212,15 @@ function applyDateTime(date) {
   const state = moonState(date);
 
   const moonPos = eclipticToScene(state.eclipticPos);
-  moonMesh.position.copy(moonPos);
+  moonMap.moonMesh.position.copy(moonPos);
 
   // Le Soleil eclaire depuis sa longitude ecliptique du jour
   const sunDir = new THREE.Vector3(Math.cos(state.sunLonRad), 0, -Math.sin(state.sunLonRad));
-  sunLight.position.copy(sunDir.clone().multiplyScalar(400));
-  sunGroup.position.copy(sunDir.clone().multiplyScalar(sunMap.distance));
+  spaceScene.sunLight.position.copy(sunDir.clone().multiplyScalar(400));
+  sunMap.sunGroup.position.copy(sunDir.clone().multiplyScalar(sunMap.distance));
 
   // La Terre tournent reellement selon la date ET l'heure choisies
-  earthMesh.rotation.y = earth.Rotation(date, state.sunLonRad);
+  earthMap.earthMesh.rotation.y = earthMap.Rotation(date, state.sunLonRad);
 
   updateOrbitLine(date);
   valDistance.textContent = `${Math.round(state.distanceKm).toLocaleString('fr-FR')} km`;
@@ -405,8 +280,7 @@ document.getElementById('btn-now').addEventListener('click', () => {
 
 const DEFAULT_CITY = { name: 'Paris, France', lat: 48.8566, lon: 2.3522 };
 let observer = { ...DEFAULT_CITY };
-updateCityMarker(observer.lat, observer.lon);
-
+earthMap.CreateCity(observer.lat, observer.lon);
 
 
 
@@ -418,8 +292,7 @@ const valMoonVisible = document.getElementById('val-moon-visible');
 
 
 // Heure solaire locale approximative : UTC decalee selon la longitude
-// (15° = 1h). Ce n'est pas le fuseau administratif (qui suit des frontières
-// et l'heure d'ete), juste une approximation basee sur la position du Soleil.
+// (15° = 1h). Ce n'est pas le fuseau administratif (qui suit des frontières et l'heure d'ete), juste une approximation basee sur la position du Soleil.
 function localSolarTimeStr(date, lonDeg) {
   const utcHours = date.getUTCHours() + date.getUTCMinutes() / 60;
   let lst = ((utcHours + lonDeg / 15) % 24 + 24) % 24;
@@ -429,42 +302,13 @@ function localSolarTimeStr(date, lonDeg) {
   return `${pad2(hh)}:${pad2(mm)}`;
 }
 
-// Altitude de la Lune au-dessus de l'horizon, pour un lieu donne (lat/lon en
-// degres). Conversion ecliptique -> equatoriale -> horizontale, coherente
-// avec le niveau de precision du reste du modèle (Schlyter, basse precision).
-function moonAltitudeDeg(date, state, latDeg, lonDeg) {
-  const eps = (23.4393 - 3.563e-7 * state.d) * DEG; // obliquite de l'ecliptique
-  const cosLat = Math.cos(state.moonLatRad);
-  const xeq = Math.cos(state.moonLonRad) * cosLat;
-  const yeq = Math.sin(state.moonLonRad) * cosLat * Math.cos(eps) - Math.sin(state.moonLatRad) * Math.sin(eps);
-  const zeq = Math.sin(state.moonLonRad) * cosLat * Math.sin(eps) + Math.sin(state.moonLatRad) * Math.cos(eps);
-
-  const ra = Math.atan2(yeq, xeq);
-  const dec = Math.atan2(zeq, Math.sqrt(xeq * xeq + yeq * yeq));
-
-  const utcHours = date.getUTCHours() + date.getUTCMinutes() / 60 + date.getUTCSeconds() / 3600;
-  const gmst0 = normDeg(state.sunLonRad / DEG + 180);
-  const lst = normDeg(gmst0 + utcHours * 15 + lonDeg) * DEG;
-  const hourAngle = lst - ra;
-
-  const latRad = latDeg * DEG;
-  const sinAlt = Math.sin(dec) * Math.sin(latRad) + Math.cos(dec) * Math.cos(latRad) * Math.cos(hourAngle);
-  return Math.asin(Math.max(-1, Math.min(1, sinAlt))) / DEG;
-}
-
-
-
-
-
-
-
 
 function updateLocationPanel(date, state) {
   if (!valLocalTime) return; // securite si les elements ne sont pas presents
-
+  const moon = new Moon();
   valLocalTime.textContent = `${localSolarTimeStr(date, observer.lon)}`;
 
-  const alt = moonAltitudeDeg(date, state, observer.lat, observer.lon);
+  const alt = moon.MoonAltitudeDeg(date, state, observer.lat, observer.lon);
   valMoonVisible.textContent = alt > 0? `Visible, ${Math.round(alt)}° au-dessus de l'horizon`: `Sous l'horizon (${Math.round(alt)}°)`;
 }
 
@@ -510,7 +354,7 @@ cityInput.addEventListener('keydown', (e) => {
   }
 });
 
-// Premier rendu, maintenant que tous les elements du panneau sont prêts
+// Premier rendu
 applyDateTime(currentDateTime);
 
 /* =========================================================================
@@ -518,15 +362,15 @@ applyDateTime(currentDateTime);
    ========================================================================= */
 
 function onResize() {
-  camera.aspect = window.innerWidth / window.innerHeight;
-  camera.updateProjectionMatrix();
+  camera.camera.aspect = window.innerWidth / window.innerHeight;
+  camera.camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth, window.innerHeight);
 }
 window.addEventListener('resize', onResize);
 
 function animate() {
   requestAnimationFrame(animate);
-  controls.update();
-  renderer.render(scene, camera);
+  camera.controls.update();
+  renderer.render(spaceScene.scene, camera.camera);
 }
 animate();

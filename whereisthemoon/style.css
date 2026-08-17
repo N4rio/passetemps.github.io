@@ -39,7 +39,7 @@ html, body {
   top: 0;
   left: 0;
   padding: 28px 32px;
-  max-width: 450px;
+  max-width: 480px;
   pointer-events: none;
 }
 
@@ -424,7 +424,7 @@ html, body {
 /* ---------- Petits écrans ---------- */
 
 @media (max-width: 640px) {
-  .hero { max-width: 260px; padding: 20px; }
+  .hero { max-width: 400px; padding: 20px; }
   .location-panel { max-width: 220px; }
   .readout { top: auto; bottom: 168px; right: 16px; left: 16px; min-width: auto; }
   .date-console { bottom: 16px; min-width: 300px; width: calc(100vw - 32px); }

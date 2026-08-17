@@ -1,9 +1,6 @@
 export class Moon {
-    constructor(name, size, initialOrientation, changeOrientation, orbitalInclination, closestPoint,closestPointDay, orbitSize, orbitShape, startAngle, speed, date) {
+    constructor(initialOrientation, changeOrientation, orbitalInclination, closestPoint,closestPointDay, orbitSize, orbitShape, startAngle, speed, date) {
         const DEG = Math.PI / 180;
-
-        this.name = name;
-        this.size = size; // Taille de la Lune pour une meilleure visibilité (distance reste reelle)
 
         // elements orbitaux moyens de la Lune
         this.orbitalOrientation = this.NormDeg(initialOrientation - changeOrientation * date )* DEG;
@@ -13,6 +10,69 @@ export class Moon {
         this.orbitShape = orbitShape; // forme de l'orbitre
         this.M = this.NormDeg(startAngle + speed * date) * DEG; // anomalie moyenne
     }
+
+    PerturbationLon(ms, D, F){
+        let dLon = 0;
+        dLon += -1.274 * Math.sin(this.M - 2 * D);
+        dLon += 0.658 * Math.sin(2 * D);
+        dLon += -0.186 * Math.sin(ms);
+        dLon += -0.059 * Math.sin(2 * this.M - 2 * D);
+        dLon += -0.057 * Math.sin(this.M - 2 * D + ms);
+        dLon += 0.053 * Math.sin(this.M + 2 * D);
+        dLon += 0.046 * Math.sin(2 * D - ms);
+        dLon += 0.041 * Math.sin(this.M - ms);
+        dLon += -0.035 * Math.sin(D);
+        dLon += -0.031 * Math.sin(this.M + ms);
+        dLon += -0.015 * Math.sin(2 * F - 2 * D);
+        dLon += 0.011 * Math.sin(this.M - 4 * D);
+
+        return dLon;
+    }
+
+    PerturbationLat(D, F){
+        let dLat = 0;
+        dLat += -0.173 * Math.sin(F - 2 * D);
+        dLat += -0.055 * Math.sin(this.M - F - 2 * D);
+        dLat += -0.046 * Math.sin(this.M + F - 2 * D);
+        dLat += 0.033 * Math.sin(F + 2 * D);
+        dLat += 0.017 * Math.sin(2 * this.M + F);
+
+        return dLat;
+    }
+
+    PerturbationDistance(D){
+        let dR = 0;
+        dR += -0.58 * Math.cos(this.M - 2 * D);
+        dR += -0.46 * Math.cos(2 * D);
+
+        return dR;
+    }
+    
+    // Altitude de la Lune au-dessus de l'horizon, pour un lieu donne (lat/lon en degres). Conversion ecliptique -> equatoriale -> horizontale, 
+    // coherente avec le niveau de precision du reste du modèle (Schlyter, basse precision).
+    MoonAltitudeDeg(date, state, latDeg, lonDeg) {
+        const eps = (23.4393 - 3.563e-7 * state.d) * Math.PI / 180; // obliquite de l'ecliptique
+        const cosLat = Math.cos(state.moonLatRad);
+        const xeq = Math.cos(state.moonLonRad) * cosLat;
+        const yeq = Math.sin(state.moonLonRad) * cosLat * Math.cos(eps) - Math.sin(state.moonLatRad) * Math.sin(eps);
+        const zeq = Math.sin(state.moonLonRad) * cosLat * Math.sin(eps) + Math.sin(state.moonLatRad) * Math.cos(eps);
+
+        const ra = Math.atan2(yeq, xeq);
+        const dec = Math.atan2(zeq, Math.sqrt(xeq * xeq + yeq * yeq));
+
+        const utcHours = date.getUTCHours() + date.getUTCMinutes() / 60 + date.getUTCSeconds() / 3600;
+        const gmst0 = this.NormDeg(state.sunLonRad / (Math.PI / 180) + 180);
+        const lst = this.NormDeg(gmst0 + utcHours * 15 + lonDeg) * Math.PI / 180;
+        const hourAngle = lst - ra;
+
+        const latRad = latDeg * Math.PI / 180;
+        const sinAlt = Math.sin(dec) * Math.sin(latRad) + Math.cos(dec) * Math.cos(latRad) * Math.cos(hourAngle);
+        return Math.asin(Math.max(-1, Math.min(1, sinAlt))) / Math.PI / 180;
+    }
+
+
+
+
 
     // Permet de calculer l’orbite, la vitesse et la période de révolution de la Lune.
     Kepler(){
