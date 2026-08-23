@@ -8,15 +8,9 @@ import { Star } from "./Models/Star.js";
 import { GraphicStar } from "./Models/GraphicStar.js";
 
 import { StarrySky } from "./Models/StarrySky.js";
-<<<<<<< HEAD
 import { GraphicPlanete } from "./Models/GraphicPlanete.js";
-
 import { SpaceScene } from "./Models/SpaceScene.js";
-
 import { Camera } from "./Models/Camera.js";
-=======
-import { Planete } from "./Models/planete.js";
->>>>>>> a817d23ff81564f13f3e4d2e2274e29e9dd72b9f
 /* =========================================================================
    ASTRONOMIE — position geocentrique reelle de la Lune
    Algorithme "basse precision" de Paul Schlyter (precision ~1° en longitude),
